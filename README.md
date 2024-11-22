@@ -1,1 +1,2 @@
 This is a drawing game where you can select the color you want to draw with and the shape you would like to draw. If you want to draw the polygon, you must press on the first x that was placed to complete it.
+If the symbols don't load in, the option below the straight line is a pencil draw option, and the two buttons below that are an undo and redo button. Pressing the z is for undoing, and pressing the y is for redoing.
