@@ -1,0 +1,266 @@
+from cmu_graphics import *
+
+# I would like to clarify that the reason you may see 0.1 randomly added is because 
+# that parameter cannot be 0 or it will crash, so I made it always at least 0.1
+
+def onAppStart(app):
+    app.width = 700
+    app.height = 450
+    app.colorSelected = ['limeGreen'] + ['black'] * 7
+    app.shapeSelected = ['black'] * 8
+    app.selection = Selection()
+    app.canvasMinX = 75
+    app.canvasMaxX = 75 + 605
+    app.canvasMinY = 50
+    app.canvasMaxY = 50 + 380
+    
+
+def redrawAll(app):
+    aesthetics(app)
+    colors = ['red', 'yellow', 'blue', 'black', 'orange', 'green', 'purple', 'gray']
+    
+    #these for loops draw the boxes for the shapes and colors, and show which are selected
+    for i in range(8):
+        if i != 6:
+            drawRect(5 + (i//4 * 35), 60 + (i%4 * 40) , 30, 30, fill = None, border = app.shapeSelected[i])
+    
+    for i in range(8):
+        drawRect(5 + (i//4 * 35), 290 + (i%4 * 40) , 30, 30, fill = colors[i], border = app.colorSelected[i])
+        
+    app.selection.drawFinished()
+    app.selection.drawOutline(app)
+    
+    
+def onMousePress(app, mouseX, mouseY):
+    if mouseX < app.canvasMinX:
+        for i in range(8):
+            app.selection.chosenColor(i, app, mouseX, mouseY)
+            app.selection.chosenShape(i, app, mouseX, mouseY)
+    elif app.canvasMaxX > mouseX > app.canvasMinX and app.canvasMaxY > mouseY > app.canvasMinY:
+        app.selection.start(mouseX, mouseY, app)
+        
+def onMouseDrag(app, mouseX, mouseY):
+    if app.canvasMaxX > mouseX > app.canvasMinX and app.canvasMaxY > mouseY > app.canvasMinY and app.selection.shape != 'Polygon':
+        app.selection.outline(mouseX, mouseY, app)
+        
+        
+def onMouseRelease(app, mouseX, mouseY):
+    if app.selection.begin and app.selection.shape != 'Polygon':
+        app.selection.finish(mouseX, mouseY, app)
+        app.selection.begin = False
+        
+def onKeyPress(app, key):
+    if key == 'z' and len(app.selection.drawings) != 0:
+        app.selection.undo.append(app.selection.drawings.pop())
+    elif key == 'y' and len(app.selection.undo) != 0:
+        app.selection.drawings.append(app.selection.undo.pop())
+        
+            
+
+class Selection:
+    colors = ['red', 'yellow', 'blue', 'black', 'orange', 'green', 'purple', 'gray']
+    shapes = ['Rect', 'Line', 'Free Style', None, 'Circle', 'Polygon']
+
+    def __init__(self):
+        self.shape = None
+        self.color = 'red'
+        self.startX = None
+        self.startY = None
+        self.dragX = None
+        self.dragY = None
+        self.holdAlign = None
+        self.begin = None
+        self.drawings = []
+        self.radius = None
+        self.undo = []
+        
+        
+
+    def chosenColor(self, i, app, mouseX, mouseY):
+        if (5 + (i//4 * 35) <= mouseX <= 35 + (i//4 * 35)) and ( 290 + (i%4 * 40) <= mouseY <=  320 + (i%4 * 40)):
+                app.colorSelected = ['black'] * 8
+                app.colorSelected[i] = 'limeGreen'
+                self.color = Selection.colors[i]
+
+    def chosenShape(self, i, app, mouseX, mouseY):
+        if (5 + (i//4 * 35) <= mouseX <= 35 + (i//4 * 35)) and ( 60 + (i%4 * 40) <= mouseY <=  90 + (i%4 * 40)):
+            if i != 3 and i != 7 and i != 6:
+                self.begin = False
+                self.startX, self.startY, self.dragX, self.dragY, self.holdAlign, self.radius = None, None, None, None, None, None
+                app.shapeSelected = ['black'] * 8
+                app.shapeSelected[i] = 'limeGreen'
+                self.shape = Selection.shapes[i]
+            elif i == 3 and len(self.drawings) != 0:
+                self.undo.append(self.drawings.pop())
+            elif i == 7 and len(self.undo) != 0:
+                self.drawings.append(self.undo.pop())
+
+#for when you begin to draw            
+    def start(self, mouseX, mouseY, app):
+        if self.color != None and self.shape != None:
+            if self.shape == 'Polygon':
+                if self.startX == None and self.startY == None:
+                    self.startX = mouseX
+                    self.startY = mouseY
+                    self.begin = True
+                else:
+                    if self.startX - 10 <= mouseX <= self.startX + 10 and self.startY - 10 <= mouseY <= self.startY + 10:
+                        self.begin = False
+                        Selection.finish(self, mouseX, mouseY, app)
+                    else:
+                        if self.dragX == None and self.dragY == None:
+                            self.dragX = [mouseX]
+                            self.dragY = [mouseY]
+                        else:
+                            self.dragX += [mouseX]
+                            self.dragY += [mouseY]
+            elif self.shape == 'Free Style':
+                self.dragX = [mouseX]
+                self.dragY = [mouseY]
+
+            else:
+                self.startX = mouseX
+                self.startY = mouseY
+
+#reads mouse movement to draw accordingly
+    def outline(self, mouseX, mouseY, app):
+        if self.color != None and self.shape != None:
+            self.begin = True
+            
+            if self.shape == 'Rect':
+                if mouseX >= self.startX and mouseY >= self.startY:
+                    self.holdAlign = 'left-top'
+                elif mouseX > self.startX and mouseY < self.startY:
+                    self.holdAlign = 'left-bottom'
+                elif mouseX <= self.startX and mouseY <= self.startY:
+                    self.holdAlign = 'right-bottom'
+                else:
+                    self.holdAlign = 'right-top'
+            
+            if self.shape != 'Polygon' and self.shape != 'Free Style':
+                self.dragX, self.dragY = mouseX, mouseY
+            
+            if self.shape == 'Free Style':
+                self.dragX += [mouseX]
+                self.dragY += [mouseY]
+            
+            if self.shape == 'Circle':
+                self.radius = distanceFormula(self.dragX, self.startX, self.dragY, self.startY)
+                if self.startX - self.radius < app.canvasMinX:
+                    self.radius = self.startX - app.canvasMinX
+                if self.startX + self.radius > app.canvasMaxX: 
+                    self.radius = app.canvasMaxX - self.startX
+                if self.startY - self.radius < app.canvasMinY: 
+                    self.radius = self.startY - app.canvasMinY
+                if self.startY + self.radius > app.canvasMaxY:
+                    self.radius = app.canvasMaxY - self.startY
+
+        
+    def drawOutline(self, app):
+        if self.begin and self.color != None and self.shape != None:
+            if self.shape == 'Rect': 
+                drawRect(self.startX, self.startY, abs(self.dragX - self.startX)+0.1, 
+                abs(self.dragY - self.startY)+0.1, align = self.holdAlign, fill = None, border = self.color )
+            
+            elif self.shape == 'Circle':
+                drawCircle(self.startX, self.startY, 0.1 + self.radius, fill = None, border = self.color) 
+            
+            elif self.shape == 'Line':
+                drawLine(self.startX, self.startY, self.dragX, self.dragY, fill = self.color)
+            
+            elif self.shape == 'Polygon':
+                drawLabel('x', self.startX, self.startY, fill = 'darkGreen')
+                if self.dragX != None and self.dragY != None:
+                    drag = outlineInterleave(self.dragX, self.dragY)
+                    for x,y in drag:
+                        drawLabel('x', x, y, fill = 'red')
+            
+            elif self.shape == 'Free Style':
+                drag = outlineInterleave(self.dragX, self.dragY)
+                for i in range(1, len(drag)):
+                    x0, y0 = drag[i-1]
+                    x1, y1 = drag[i]
+                    drawLine(x0, y0, x1, y1, fill = self.color)
+                        
+            
+    def drawFinished(self):
+        if self.begin != None and self.color != None and self.shape != None:
+            for shape, startX, startY, dragX, dragY, align, color, radius in self.drawings:
+                if shape == 'Rect': 
+                    drawRect(startX, startY, abs(dragX - startX)+0.1, 
+                    abs(dragY - startY)+0.1, align = align, fill = color )
+                elif shape == 'Circle':
+                    drawCircle(startX, startY, 0.1 + radius , fill = color) 
+                elif shape == 'Line':
+                    drawLine(startX, startY, dragX, dragY, fill = color)
+                elif shape == 'Polygon':
+                    drag = [startX] + [startY] + interleave(dragX, dragY)
+                    drawPolygon(*drag, fill = color)
+                elif shape == 'Free Style':
+                    drag = outlineInterleave(dragX, dragY)
+                    for i in range(1, len(drag)):
+                        x0, y0 = drag[i-1]
+                        x1, y1 = drag[i]
+                        drawLine(x0, y0, x1, y1, fill = color)
+    
+#resets variables for the next drawing                    
+    def finish(self, mouseX, mouseY, app):
+        if self.color != None and self.shape != None:
+            self.drawings.append((self.shape, self.startX, self.startY, self.dragX, self.dragY, self.holdAlign, self.color, self.radius))
+            self.startX, self.startY, self.dragX, self.dragY, self.holdAlign, self.radius = None, None, None, None, None, None
+            self.undo = []
+                        
+                    
+def distanceFormula(x1, x2, y1, y2):
+    return ((x1-x2)**2 + (y1 - y2)**2)**0.5
+
+#for list of tuples
+def outlineInterleave(L, M):
+    if L == []:
+        return M
+    elif M == []:
+        return L
+    elif M == [] and L == []:
+        return []
+    else:
+        Lfirst, Lrest = L[0], L[1:]
+        Mfirst, Mrest = M[0], M[1:]
+        return [(Lfirst,Mfirst)] + outlineInterleave(Lrest, Mrest)
+
+def interleave(L, M):
+    if L == []:
+        return M
+    elif M == []:
+        return L
+    elif M == [] and L == []:
+        return []
+    else:
+        Lfirst, Lrest = L[0], L[1:]
+        Mfirst, Mrest = M[0], M[1:]
+        return [Lfirst] + [Mfirst] + interleave(Lrest, Mrest)
+
+def aesthetics(app):
+    drawRect(0, 0, app.width, app.height, fill = 'gainsboro')
+    drawRect(75, 50, 605, 380, fill = 'white')
+    drawLabel('NadiaPaints', app.width/2, 25, size = 30, font = 'caveat')
+    drawLine(0, 50, app.width, 50)
+    drawLine(75, 430, 680, 430)
+    drawLine(75, 50, 75, app.height)
+    drawLine(680, 50, 680, 430)
+    
+
+    drawRect(10, 65, 20, 20, fill = 'darkGray', border = 'dimgray')
+    drawCircle(55, 75, 10, fill = 'darkGray', border = 'dimgray')
+    drawLine(12, 123, 28, 107, fill = 'dimGray')
+    drawLabel(f'{chr(0x270f)}' ,20, 155, font = 'symbols', size = 20, rotateAngle = 135, fill = 'dimgray')
+    drawLabel(f'{chr(0x1f808)}', 20, 195, font = 'symbols', size = 20, fill = 'dimgray' )
+    drawLabel(f'{chr(0x1f80a)}', 55, 195, font = 'symbols', size = 20, fill = 'dimgray' )
+    drawPolygon(50, 120, 45, 110, 62, 105, 59, 125, fill = 'darkGray', border = 'dimgray')
+    drawLabel('z', 11, 204, fill = 'dimgray')
+    drawLabel('y', 46, 204, fill = 'dimgray')
+    drawLabel('Fill Options', 37, 275, size = 13, italic = True)
+
+def main():
+    runApp()
+
+main()
