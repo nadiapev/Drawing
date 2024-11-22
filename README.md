@@ -1,0 +1,1 @@
+This is a drawing game where you can select the color you want to draw with and the shape you would like to draw. If you want to draw the polygon, you must press on the first x that was placed to complete it.
